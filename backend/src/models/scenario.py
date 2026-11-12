@@ -7,6 +7,7 @@ class CapacityScenario(Base):
  name:Mapped[str]=mapped_column(String(160),unique=True)
  profile_id:Mapped[str]=mapped_column(ForeignKey("service_profiles.id"))
  windows:Mapped[int]=mapped_column(Integer)
+ window_schedule:Mapped[list|None]=mapped_column(JSON,nullable=True)
  arrival_multiplier:Mapped[float]=mapped_column(Float)
  service_multiplier:Mapped[float]=mapped_column(Float)
  duration_minutes:Mapped[int]=mapped_column(Integer)

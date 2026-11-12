@@ -28,7 +28,7 @@ docker compose exec -T backend python -m scripts.seed_demo
 
 ## 核心实体与数据
 
-ArrivalDataset保存匿名sample_id、时段、到达间隔和服务时长；ServiceProfile保存所选时段的均值、CV、λ/μ与校验码；CapacityScenario保存窗口数、率倍率、时域、预热、重复数与seed；SimulationRun保存真实队列状态及结果；CapacityReview保存人工意见；Report仅在最新人工意见接受后由管理员归档。报告按run唯一；源样本ID唯一，分数/个人身份等信息不被采集。
+ArrivalDataset保存匿名sample_id、时段、到达间隔和服务时长；ServiceProfile保存所选时段的均值、CV、λ/μ与校验码；CapacityScenario保存窗口数、可选分时段开窗配置window_schedule、率倍率、时域、预热、重复数与seed；SimulationRun保存真实队列状态及结果；CapacityReview保存人工意见；Report仅在最新人工意见接受后由管理员归档。报告按run唯一；源样本ID唯一，分数/个人身份等信息不被采集。
 
 SEED_DEMO=true启动建表并幂等填充，固定自然键/种子ID，不重复插入也不覆盖用户修改。480条观测由seed2206生成，高峰/平峰采用不同到达间隔均值，单次服务均值12分钟；种子包含2/3/4窗口三方案和真实计算的3窗口结果及归档。所有输入仅为模拟；实际模型输入必须来自经过核查的时段样本。
 
@@ -36,8 +36,9 @@ SEED_DEMO=true启动建表并幂等填充，固定自然键/种子ID，不重复
 
 1. Erlang-C M/M/c。统一用分钟：λ=1/平均到达间隔，μ=1/平均单次服务时长，c为窗口数，ρ=λ/(cμ)。当ρ≥1明确返回stable=false，等待概率、Wq、系统时长、队长均为null，没有有限稳态值。稳定时用Erlang-B递推 `B0=1; Bk=a*B(k-1)/(k+a*B(k-1))`，a=λ/μ，再得 `C=Bc/(1-rho+rho*Bc)`、`Wq=C/(c*mu-lambda)`、`Lq=lambda*Wq`、`W=Wq+1/mu`。稳态要求泊松到达、独立指数服务、同质窗口、无限等候空间和先到先服务。
 2. 离散事件仿真。固定seed+重复序号生成指数到达间隔与服务时长；最小堆选择最早空闲窗口，服务开始=max(到达,窗口空闲)，等待=开始-到达。从空系统开始，先运行warmup，再统计观测时域内的到达；这些任务服务可以延续至观测结束后。窗口忙碌比例按所有服务区间与观测期的交集积分，分母为c×观测分钟，不把提供负荷误作忙碌比例。多次重复报告均值、等待概率与 `mean ± 1.96*sd(rep_means)/sqrt(R)` 正态近似区间。最后一次重复保留前80个事件，UI绘制前35个真实服务事件。
+3. 分时段变窗仿真。方案可选 `window_schedule=[{start,windows}, ...]`，时间为仿真钟分钟（0=仿真开始，含预热），首段须从0开始、起点严格递增、末段至少1窗、开窗数0—12；相邻同容量段自动合并。调度语义：减窗时空闲窗口立即退出，忙碌窗口办完手中样本后退出（不抢占、不中断）；容量降到0期间新样本进入队列不分配窗口，恢复开窗后严格按到达顺序（FCFS）办理；增窗补入新窗口承接队列；调窗跨越预热时队列与在办样本连续延续、系统不重置。分时段统计按样本到达所属时段给出到达量（重复均值）、平均等待、等待概率与实际忙碌比例；忙碌按服务区间与“观测期∩时段”交集积分，容量为0的时段忙碌比例留空。变窗不存在单一稳态：`analytic.stable=false`、ρ与稳态等待均为null，分时段Erlang-C仅作该段恒定容量的参考，结果明确标注为暂态，不得作为稳态结论。固定开窗（`window_schedule` 为 NULL）仍走原恒定容量堆调度与Erlang-C路径，数值与升级前逐事件一致、可复现；变窗运行的CSV在原重复试验表后追加分时段统计表。
 
-复现：相同观测JSON校验码、剖面时段、窗口数、倍率、时域、warmup、重复数与seed产生相同结果。输入有限正时长、至少20条最多5000条；窗口1—12、重复5—100、观测60—1440分钟、预热0—1440分钟，率倍率0.2—3。预期事件超过20000拒绝，实际单次超过50000事件拒绝，避免过大请求。
+复现：相同观测JSON校验码、剖面时段、窗口数、分时段开窗配置、倍率、时域、warmup、重复数与seed产生相同结果。输入有限正时长、至少20条最多5000条；窗口1—12、重复5—100、观测60—1440分钟、预热0—1440分钟，率倍率0.2—3。变窗时段起点0—2880分钟、每段开窗0—12、首段从0开始且末段至少1窗。预期事件超过20000拒绝，实际单次超过50000事件拒绝，避免过大请求。
 
 失败态：所选时段不足20条、样本编号重复、时长非正/非有限、无到达事件、队列不可用或无效窗口均有服务端错误；运行失败保留error并可新建运行重试。ρ≥1属于可计算的过载场景，解析值无稳态，有限期仿真继续并明确标识暂态。
 
@@ -52,7 +53,7 @@ SEED_DEMO=true启动建表并幂等填充，固定自然键/种子ID，不重复
 |持久化|MySQL8.4，JSON列保存样本和计算结果|
 |后台|Redis7.4持久化队列，独立Python worker与心跳|
 
-目录frontend/src包含api/stores/types/components/common/hooks/pages/router/utils/constants；backend/src包含routes/controllers/services/models/schemas/middlewares/utils/constants/config；backend/scripts含seed，backend/migrations说明初次建表方式。测试、日志、截图及报告在批次test-artifacts/gb-2206，未混入源码。
+目录frontend/src包含api/stores/types/components/common/hooks/pages/router/utils/constants；backend/src包含routes/controllers/services/models/schemas/middlewares/utils/constants/config；backend/scripts含seed，backend/migrations说明初次建表方式，002为变窗window_schedule列的幂等ALTER（新部署由metadata直接建表，旧库执行该SQL升级）。测试、日志、截图及报告在批次test-artifacts/gb-2206，未混入源码；变窗引擎验证脚本位于仓库verify/目录。
 
 本地开发：在backend安装requirements.txt，配置DATABASE_URL、REDIS_URL、JWT_SECRET后执行`uvicorn src.main:app --reload`，另开`python -m src.worker`；frontend执行`npm install && npm run dev`，Vite已将/api代理到本机19215并去除前缀。Docker由Nginx执行同样代理。
 

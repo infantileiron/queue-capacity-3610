@@ -19,7 +19,12 @@ def seed():
   if not db.get(ServiceProfile,"demo-profile"):db.add(ServiceProfile(id="demo-profile",name="全日均值·单窗口服务剖面",dataset_id="demo-data",period="all",created_at=now(),**fit_profile(rows,"all")));db.flush()
   for c in (2,3,4):
    id=f"demo-scenario-{c}"
-   if not db.get(CapacityScenario,id):db.add(CapacityScenario(id=id,name=f"{c}窗口·全日容量预演",profile_id="demo-profile",windows=c,arrival_multiplier=1,service_multiplier=1,duration_minutes=480,warmup_minutes=120,replications=30,seed=2206,created_at=now()))
+   if not db.get(CapacityScenario,id):db.add(CapacityScenario(id=id,name=f"{c}窗口·全日容量预演",profile_id="demo-profile",windows=c,window_schedule=None,arrival_multiplier=1,service_multiplier=1,duration_minutes=480,warmup_minutes=120,replications=30,seed=2206,created_at=now()))
+  # 变窗演示：仿真钟0=开始（含预热120分钟）。预热内100分钟处4→3窗延续队列；
+  # 观测期180分钟处午间停窗（容量0），360分钟处恢复并增开到4窗。
+  variable_schedule=[{"start":0,"windows":4},{"start":100,"windows":3},{"start":300,"windows":0},{"start":480,"windows":4}]
+  if not db.get(CapacityScenario,"demo-scenario-variable"):
+   db.add(CapacityScenario(id="demo-scenario-variable",name="分时段开窗·午间停窗下午增窗",profile_id="demo-profile",windows=4,window_schedule=variable_schedule,arrival_multiplier=1,service_multiplier=1,duration_minutes=480,warmup_minutes=120,replications=30,seed=2206,created_at=now()))
   db.flush()
   if not db.get(SimulationRun,"demo-run"):
    db.add(SimulationRun(id="demo-run",scenario_id="demo-scenario-3",status="completed",result=analyze(db.get(ServiceProfile,"demo-profile"),db.get(CapacityScenario,"demo-scenario-3")),error="",created_at=now()));db.flush()

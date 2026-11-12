@@ -17,4 +17,9 @@ def export(db,id):
  result=require_completed(db,report.run_id).result
  columns=["replication","arrivals","mean_wait_minutes","p_wait","max_wait_minutes","busy_fraction"]
  buf=io.StringIO();writer=csv.DictWriter(buf,columns);writer.writeheader();writer.writerows(result["simulation"]["replications"])
- return "\ufeff"+buf.getvalue()
+ if result["simulation"].get("capacity_mode")=="variable":
+  buf.write("\n分时段统计（仿真钟分钟，0=仿真开始含预热；容量0时段忙碌比例留空）\n")
+  seg_columns=["start","end","windows","observed","arrivals","mean_wait_minutes","p_wait","busy_fraction"]
+  seg_writer=csv.DictWriter(buf,seg_columns,extrasaction="ignore")
+  seg_writer.writeheader();seg_writer.writerows(result["simulation"]["segment_summary"])
+ return "﻿"+buf.getvalue()
