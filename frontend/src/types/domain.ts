@@ -2,11 +2,14 @@ export interface User{email:string;role:string}
 export interface Observation{sample_id:string;period:string;interarrival_minutes:number;service_minutes:number}
 export interface Dataset{id:string;name:string;source:string;rows:Observation[];created_at:string}
 export interface Profile{id:string;name:string;dataset_id:string;period:string;arrival_rate:number;service_rate:number;statistics:{n:number;mean_interarrival:number;mean_service:number;interarrival_cv:number;service_cv:number;checksum:string};created_at:string}
-export interface Scenario{id:string;name:string;profile_id:string;windows:number;arrival_multiplier:number;service_multiplier:number;duration_minutes:number;warmup_minutes:number;replications:number;seed:number;created_at:string}
-export interface Analytic{arrival_rate:number;service_rate:number;windows:number;rho:number;stable:boolean;p_wait:number|null;mean_wait_minutes:number|null;mean_system_minutes:number|null;mean_queue_length:number|null}
+export interface WindowSegment{start_minute:number;windows:number}
+export interface Scenario{id:string;name:string;profile_id:string;windows:number;arrival_multiplier:number;service_multiplier:number;duration_minutes:number;warmup_minutes:number;replications:number;seed:number;window_schedule:WindowSegment[]|null;created_at:string}
+export interface Analytic{arrival_rate:number;service_rate:number;windows:number;rho:number;stable:boolean;steady_state_applicable?:boolean;capacity_mode?:'fixed'|'variable';p_wait:number|null;mean_wait_minutes:number|null;mean_system_minutes:number|null;mean_queue_length:number|null}
 export interface Replication{replication:number;arrivals:number;mean_wait_minutes:number;p_wait:number;max_wait_minutes:number;busy_fraction:number}
 export interface Event{job:number;arrival:number;service:number;start:number;end:number;wait:number;server:number}
-export interface Result{analytic:Analytic;simulation:{mean_wait_minutes:number;mean_wait_ci95:[number,number];p_wait:number;busy_fraction:number;replications:Replication[];timeline:Event[];duration_minutes:number;warmup_minutes:number;seed:number;ci_method:string};comparison:Analytic[];profile_statistics:Profile['statistics'];assumptions:string[]}
+export interface SegmentSummary{segment:number;start_minute:number;end_minute:number;windows:number;observed:boolean;arrivals:number;mean_wait_minutes:number|null;p_wait:number|null;max_wait_minutes:number|null;busy_fraction:number|null}
+export interface SimulationResult{mean_wait_minutes:number;mean_wait_ci95:[number,number];p_wait:number;busy_fraction:number|null;replications:Replication[];timeline:Event[];duration_minutes:number;warmup_minutes:number;seed:number;ci_method:string;capacity_mode:'fixed'|'variable';window_schedule?:WindowSegment[];segment_summaries?:SegmentSummary[]}
+export interface Result{analytic:Analytic;simulation:SimulationResult;comparison:Analytic[];profile_statistics:Profile['statistics'];capacity_mode?:'fixed'|'variable';assumptions:string[]}
 export interface Run{id:string;scenario_id:string;status:string;result:Result;error:string;created_at:string}
 export interface Review{id:string;run_id:string;note:string;decision:string;author:string;created_at:string}
 export interface Report{id:string;run_id:string;title:string;published_by:string;created_at:string}

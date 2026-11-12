@@ -13,4 +13,5 @@ class CapacityScenario(Base):
  warmup_minutes:Mapped[int]=mapped_column(Integer)
  replications:Mapped[int]=mapped_column(Integer)
  seed:Mapped[int]=mapped_column(Integer)
+ window_schedule:Mapped[list|None]=mapped_column(JSON,nullable=True,default=None)
  created_at:Mapped[str]=mapped_column(String(64))
